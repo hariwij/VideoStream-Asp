@@ -17,13 +17,9 @@ namespace VideoStream_Test.Controllers
     {
         #region Fields
 
-        // This will be used in copying input stream to output stream.
         public const int ReadStreamBufferSize = 1024 * 1024;
-        // We have a read-only dictionary for mapping file extensions and MIME names. 
         public static readonly IReadOnlyDictionary<string, string> MimeNames;
-        // We will discuss this later.
         public static readonly IReadOnlyCollection<char> InvalidFileNameChars;
-        // Where are your videos located at? Change the value to any folder you want.
         public static readonly string InitialDirectory;
 
         #endregion
@@ -34,7 +30,7 @@ namespace VideoStream_Test.Controllers
         {
             var mimeNames = new Dictionary<string, string>();
 
-            mimeNames.Add(".mp3", "audio/mpeg");    // List all supported media types; 
+            mimeNames.Add(".mp3", "audio/mpeg"); 
             mimeNames.Add(".mp4", "video/mp4");
             mimeNames.Add(".ogg", "application/ogg");
             mimeNames.Add(".ogv", "video/ogg");
@@ -55,11 +51,6 @@ namespace VideoStream_Test.Controllers
         [HttpGet]
         public HttpResponseMessage Play(string f)
         {
-            // This can prevent some unnecessary accesses. 
-            // These kind of file names won't be existing at all. 
-            //if (string.IsNullOrWhiteSpace(f) || AnyInvalidFileNameChars(f))
-            //    throw new HttpResponseException(HttpStatusCode.NotFound);
-
             FileInfo fileInfo = new FileInfo(f);
 
             if (!fileInfo.Exists)
@@ -72,14 +63,13 @@ namespace VideoStream_Test.Controllers
 
             response.Headers.AcceptRanges.Add("bytes");
 
-            // The request will be treated as normal request if there is no Range header.
             if (rangeHeader == null || !rangeHeader.Ranges.Any())
             {
                 response.StatusCode = HttpStatusCode.OK;
                 response.Content = new PushStreamContent((outputStream, httpContent, transpContext)
                 =>
                 {
-                    using (outputStream) // Copy the file to output stream straightforward. 
+                    using (outputStream) 
                     using (Stream inputStream = fileInfo.OpenRead())
                     {
                         try
@@ -99,14 +89,11 @@ namespace VideoStream_Test.Controllers
 
             long start = 0, end = 0;
 
-            // 1. If the unit is not 'bytes'.
-            // 2. If there are multiple ranges in header value.
-            // 3. If start or end position is greater than file length.
             if (rangeHeader.Unit != "bytes" || rangeHeader.Ranges.Count > 1 ||
                 !TryReadRangeItem(rangeHeader.Ranges.First(), totalLength, out start, out end))
             {
                 response.StatusCode = HttpStatusCode.RequestedRangeNotSatisfiable;
-                response.Content = new StreamContent(Stream.Null);  // No content for this status.
+                response.Content = new StreamContent(Stream.Null);
                 response.Content.Headers.ContentRange = new ContentRangeHeaderValue(totalLength);
                 response.Content.Headers.ContentType = GetMimeNameFromExt(fileInfo.Extension);
 
@@ -115,12 +102,11 @@ namespace VideoStream_Test.Controllers
 
             var contentRange = new ContentRangeHeaderValue(start, end, totalLength);
 
-            // We are now ready to produce partial content.
             response.StatusCode = HttpStatusCode.PartialContent;
             response.Content = new PushStreamContent((outputStream, httpContent, transpContext)
             =>
             {
-                using (outputStream) // Copy the file to output stream in indicated range.
+                using (outputStream) 
                 using (Stream inputStream = fileInfo.OpenRead())
                     CreatePartialContent(inputStream, outputStream, start, end);
 
